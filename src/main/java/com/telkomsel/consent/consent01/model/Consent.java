@@ -18,8 +18,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
-
-import com.telkomsel.login.login01.model.Login;
+//import com.telkomsel.login.login01.model.Login;
 
 @Service
 @ConfigurationProperties
@@ -57,12 +56,12 @@ public class Consent {
 		String result = "000";
 		
 		//login first
-		Login lg = new Login();
-		String resp = lg.login(username, password, api_key_login, api_secret_login, api_url_login);
+		//Login lg = new Login();
+		String resp = login(username, password, api_key_login, api_secret_login, api_url_login);
 		String session_id = this.getSessionID(resp);
 		String consent_timestamp = Long.toString(System.currentTimeMillis());
 
-		JSONObject requestBody = constructSMSBody(session_id,msisdn,product_code,customer_name,consent_id,consent_channel,consent_timestamp);
+		JSONObject requestBody = constructSMSBodyConsent(session_id,msisdn,product_code,customer_name,consent_id,consent_channel,consent_timestamp);
 		String x_signature = getXSignature(api_key_consent, api_secret_consent);
 		
 		// Response variable
@@ -113,7 +112,76 @@ public class Consent {
 		return result;
 	}
 	
-	private static JSONObject constructSMSBody(String session_id, String msisdn, String product_code, String customer_name, String consent_id, String consent_channel, String consent_timestamp) {
+public String login(String username, String password, String api_key, String api_secret, String api_url) {
+		
+		String result = "000";
+
+		JSONObject requestBody = constructSMSBodyLogin(username, password);
+		System.out.println("Request body = " + requestBody.toString());
+
+		// Generate signature
+		String x_signature = getXSignature(api_key, api_secret);
+		System.out.println("X-Signature = " + x_signature);
+
+		// Response variable
+		String mashery_response = null;
+		int mashery_response_code = 0;
+
+		try {
+			URL obj = new URL(api_url);
+			HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+
+			// add request header
+			con.setRequestMethod("POST");
+			con.setRequestProperty("Content-Type", "application/json");
+			con.setRequestProperty("api_key", api_key);
+			con.setRequestProperty("x-signature", x_signature);
+			// con.setReadTimeout(mashery_timeout);
+			con.setDoOutput(true);
+
+			// Send post request
+			DataOutputStream wr = new DataOutputStream(con.getOutputStream());
+			wr.writeBytes(requestBody.toString());
+			wr.flush();
+			wr.close();
+
+			mashery_response_code = con.getResponseCode();
+
+			BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+			String inputLine;
+			StringBuffer response = new StringBuffer();
+			while ((inputLine = in.readLine()) != null) {
+				response.append(inputLine);
+			}
+			in.close();
+			mashery_response = response.toString();
+
+			Map<String, List<String>> map = con.getHeaderFields();
+			for (Map.Entry<String, List<String>> entry : map.entrySet()) {
+				// System.out.println("Key : " + entry.getKey()
+				// + " ,Value : " + entry.getValue());
+				//System.out.println(entry.getKey() + " : " + entry.getValue());
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		//result = "Resp Code : " + mashery_response_code + ", Resp : " + mashery_response;
+		result = mashery_response;
+
+		return result;
+	}
+
+	private static JSONObject constructSMSBodyLogin(String username, String password) {
+
+		JSONObject login_body = new JSONObject();
+		login_body.put("username", username);
+		login_body.put("password", password);
+
+		return login_body;
+	}
+	
+	private static JSONObject constructSMSBodyConsent(String session_id, String msisdn, String product_code, String customer_name, String consent_id, String consent_channel, String consent_timestamp) {
 
 		JSONObject consent_body = new JSONObject();
 		consent_body.put("session_id", session_id);
